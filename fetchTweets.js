@@ -1,3 +1,4 @@
+require('dotenv').config();
 const { Rettiwt } = require('rettiwt-api');
 const { Resend } = require('resend');
 const OpenAI = require('openai');
@@ -8,14 +9,14 @@ const db = require('./database');
 
 // Initialize OpenAI with API key
 const openai = new OpenAI({
-    apiKey: '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'
+    apiKey: process.env.OPENAI_API_KEY
 });
 
 // Initialize Resend with your API key
-const resend = new Resend('re_775Gtu4v_HeNTJxs22BZnrC678CxYavRg');
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Initialize Rettiwt with API key
-const rettiwt = new Rettiwt({ apiKey: 'a2R0PUhTOGxWQWpZbUxxQmtBSzU4UXN1cm1RRGRLZlFDbWlsa09zYm11NDM7YXV0aF90b2tlbj05YzMyYTRlMjI4OTU5YThhYTM3YTEwZWRmOTQzYWJmNDFkNjRiYTI1O2N0MD01ZjE2MjdiM2YyMDY1YmJiOGU4ZGEzNjQxYTNlZTFhMDVjMmVhMjMzNzU2MGViMDgzNDk3NjM3ZjRjZjJiYTk4OGI5NTg1OTdjMDdkMGNiOGE5YjUwYjUzY2M3NDMxYTFmMzU3Njk5YzI2MjY0MWU4MjcyNjViMDliYjhkYjFiYTU0N2JmYjFiYWY4OTZlNWMxM2MwYzk3ZmZkZmZkZDljO3R3aWQ9dSUzRDE5MDA5NDY2MjYzOTY3NzQ0MDA7' });
+const rettiwt = new Rettiwt({ apiKey: process.env.RETTIWT_API_KEY });
 
 // Function to summarize tweets using OpenAI
 async function summarizeTweets(tweets) {
