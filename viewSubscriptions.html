@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tweet Subscriptions</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 20px auto;
+            padding: 0 20px;
+            background-color: #f5f8fa;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        h1, h2 {
+            color: #1da1f2;
+        }
+        .subscription {
+            border: 1px solid #e1e8ed;
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .tweet {
+            border-left: 3px solid #1da1f2;
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #f8f9fa;
+        }
+        .meta {
+            color: #657786;
+            font-size: 0.9em;
+            margin: 5px 0;
+        }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            background-color: #f5f8fa;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .tab.active {
+            background-color: #1da1f2;
+            color: white;
+        }
+        #subscriptionsView, #tweetsView {
+            display: none;
+        }
+        .show {
+            display: block !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Tweet Database Viewer</h1>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="showView('subscriptions')">Subscriptions</button>
+            <button class="tab" onclick="showView('tweets')">Tweets</button>
+        </div>
+
+        <div id="subscriptionsView" class="show"></div>
+        <div id="tweetsView"></div>
+    </div>
+
+    <script>
+        function showView(view) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('button').forEach(btn => {
+                if (btn.textContent.toLowerCase().includes(view)) {
+                    btn.classList.add('active');
+                }
+            });
+
+            document.getElementById('subscriptionsView').classList.toggle('show', view === 'subscriptions');
+            document.getElementById('tweetsView').classList.toggle('show', view === 'tweets');
+
+            if (view === 'subscriptions') {
+                fetchSubscriptions();
+            } else {
+                fetchTweets();
+            }
+        }
+
+        async function fetchSubscriptions() {
+            try {
+                const response = await fetch('/subscriptions');
+                const data = await response.json();
+                const container = document.getElementById('subscriptionsView');
+                
+                if (data.length === 0) {
+                    container.innerHTML = '<p>No subscriptions found</p>';
+                    return;
+                }
+
+                container.innerHTML = `
+                    <h2>Subscriptions (${data.length})</h2>
+                    ${data.map(sub => `
+                        <div class="subscription">
+                            <div class="meta">ID: ${sub.id}</div>
+                            <div>Email: ${sub.email}</div>
+                            <div>Username: @${sub.username}</div>
+                            <div class="meta">Created: ${new Date(sub.created_at).toLocaleString()}</div>
+                        </div>
+                    `).join('')}
+                `;
+            } catch (error) {
+                document.getElementById('subscriptionsView').innerHTML = `<p>Error loading subscriptions: ${error.message}</p>`;
+            }
+        }
+
+        async function fetchTweets() {
+            try {
+                const response = await fetch('/stored-tweets');
+                const data = await response.json();
+                const container = document.getElementById('tweetsView');
+                
+                if (data.length === 0) {
+                    container.innerHTML = '<p>No tweets found</p>';
+                    return;
+                }
+
+                container.innerHTML = `
+                    <h2>Stored Tweets (${data.length})</h2>
+                    ${data.map(tweet => `
+                        <div class="tweet">
+                            <div class="meta">Tweet ID: ${tweet.tweet_id}</div>
+                            <div class="meta">By: @${tweet.username} | For: ${tweet.email}</div>
+                            <p>${tweet.content}</p>
+                            <div class="meta">
+                                Created: ${new Date(tweet.created_at).toLocaleString()}<br>
+                                Fetched: ${new Date(tweet.fetched_at).toLocaleString()}
+                            </div>
+                        </div>
+                    `).join('')}
+                `;
+            } catch (error) {
+                document.getElementById('tweetsView').innerHTML = `<p>Error loading tweets: ${error.message}</p>`;
+            }
+        }
+
+        // Load subscriptions by default
+        fetchSubscriptions();
+    </script>
+</body>
+</html>

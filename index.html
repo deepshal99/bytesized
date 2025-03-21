@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tweet Fetcher</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 0 20px;
+            background-color: #f5f8fa;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #1da1f2;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+        button:hover {
+            background-color: #1991db;
+        }
+        #output {
+            white-space: pre-wrap;
+            font-family: monospace;
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        .error {
+            color: #e0245e;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Tweet Fetcher</h1>
+        <div class="input-group">
+            <label for="email">Email:</label>
+            <input type="email" id="email" placeholder="Enter your email" required />
+            
+            <label for="username">Twitter Username:</label>
+            <input type="text" id="username" placeholder="Enter Twitter username (without @)" required />
+            
+            <button onclick="fetchTweets()">Subscribe & Fetch Tweets</button>
+        </div>
+        <div id="output"></div>
+    </div>
+
+    <script>
+        async function fetchTweets() {
+            const email = document.getElementById('email').value.trim();
+            const username = document.getElementById('username').value.trim();
+            const output = document.getElementById('output');
+            
+            if (!email || !username) {
+                output.innerHTML = '<div class="error">Please enter both email and username</div>';
+                return;
+            }
+
+            if (!isValidEmail(email)) {
+                output.innerHTML = '<div class="error">Please enter a valid email address</div>';
+                return;
+            }
+
+            output.textContent = 'Fetching tweets...';
+            
+            try {
+                const response = await fetch('/fetch-tweets', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, username })
+                });
+
+                const data = await response.text();
+                output.textContent = data;
+            } catch (error) {
+                output.innerHTML = '<div class="error">Error fetching tweets: ' + error.message + '</div>';
+            }
+        }
+
+        function isValidEmail(email) {
+            return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+        }
+
+        // Allow Enter key to trigger the fetch
+        document.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                fetchTweets();
+            }
+        });
+    </script>
+</body>
+</html>

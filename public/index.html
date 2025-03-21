@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tweet Fetcher</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 0 20px;
+            background-color: #f5f8fa;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .input-group {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        input {
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            flex-grow: 1;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #1da1f2;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #1991db;
+        }
+        #tweets {
+            margin-top: 20px;
+        }
+        .tweet {
+            border-bottom: 1px solid #e1e8ed;
+            padding: 15px 0;
+        }
+        .tweet-time {
+            color: #657786;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+        .tweet-text {
+            margin: 0;
+            line-height: 1.4;
+        }
+        .error {
+            color: #e0245e;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Tweet Fetcher</h1>
+        <div class="input-group">
+            <input type="text" id="username" placeholder="Enter Twitter username (without @)" />
+            <button onclick="fetchTweets()">Fetch Tweets</button>
+        </div>
+        <div id="tweets"></div>
+    </div>
+
+    <script>
+        async function fetchTweets() {
+            const username = document.getElementById('username').value.trim();
+            const tweetsDiv = document.getElementById('tweets');
+            
+            if (!username) {
+                tweetsDiv.innerHTML = '<div class="error">Please enter a username</div>';
+                return;
+            }
+
+            tweetsDiv.innerHTML = 'Loading...';
+            
+            try {
+                const response = await fetch(`/tweets/${username}`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    tweetsDiv.innerHTML = `<div class="error">${data.error}</div>`;
+                    return;
+                }
+
+                if (data.tweets.length === 0) {
+                    tweetsDiv.innerHTML = '<div>No original tweets found in the recent timeline.</div>';
+                    return;
+                }
+
+                const tweetHtml = data.tweets.map(tweet => `
+                    <div class="tweet">
+                        <div class="tweet-time">${new Date(tweet.createdAt).toLocaleString()}</div>
+                        <p class="tweet-text">${tweet.fullText}</p>
+                    </div>
+                `).join('');
+
+                tweetsDiv.innerHTML = tweetHtml + `
+                    <div style="margin-top: 15px">
+                        Total original tweets found: ${data.tweets.length}
+                    </div>`;
+            } catch (error) {
+                tweetsDiv.innerHTML = '<div class="error">Error fetching tweets. Please try again.</div>';
+            }
+        }
+
+        // Allow Enter key to trigger the fetch
+        document.getElementById('username').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                fetchTweets();
+            }
+        });
+    </script>
+</body>
+</html>
