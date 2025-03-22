@@ -121,10 +121,28 @@ function getTweetsForSubscription(email, username) {
     });
 }
 
+// Get handles associated with an email
+function getHandlesByEmail(email) {
+    return new Promise((resolve, reject) => {
+        db.all(
+            'SELECT username FROM subscriptions WHERE email = ?',
+            [email],
+            (err, rows) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve(rows.map(row => row.username));
+                }
+            }
+        );
+    });
+}
+
 module.exports = {
     addSubscription,
     saveTweets,
     getSubscriptions,
     getTweets,
-    getTweetsForSubscription
+    getTweetsForSubscription,
+    getHandlesByEmail
 };
