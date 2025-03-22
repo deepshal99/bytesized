@@ -1,148 +1,129 @@
 const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
+const db = new sqlite3.Database('./newsletter.db');
 
-const dbPath = path.join(__dirname, 'twitter.db');
-const db = new sqlite3.Database(dbPath);
-
-// Initialize database tables
+// Initialize database with improved schema
 db.serialize(() => {
-    // Create subscriptions table
-    db.run(`CREATE TABLE IF NOT EXISTS subscriptions (
+    // Users table
+    db.run(`CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        email TEXT NOT NULL,
-        username TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        preferences TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(email, username)
+        last_active DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 
-    // Create tweets table
+    // Subscriptions table
+    db.run(`CREATE TABLE IF NOT EXISTS subscriptions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        handle TEXT NOT NULL,
+        is_active BOOLEAN DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(user_id) REFERENCES users(id),
+        UNIQUE(user_id, handle)
+    )`);
+
+    // Tweets table
     db.run(`CREATE TABLE IF NOT EXISTS tweets (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        tweet_id TEXT NOT NULL,
-        username TEXT NOT NULL,
-        email TEXT NOT NULL,
+        tweet_id TEXT UNIQUE NOT NULL,
+        handle TEXT NOT NULL,
         content TEXT NOT NULL,
-        created_at DATETIME NOT NULL,
-        fetched_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(tweet_id, username, email)
+        processed BOOLEAN DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(handle) REFERENCES subscriptions(handle)
     )`);
 });
 
-// Add new subscription
-function addSubscription(email, username) {
-    return new Promise((resolve, reject) => {
-        const stmt = db.prepare('INSERT OR IGNORE INTO subscriptions (email, username) VALUES (?, ?)');
-        stmt.run([email, username], function(err) {
-            if (err) {
-                reject(err);
-            } else {
-                resolve(this.lastID);
-            }
-        });
-        stmt.finalize();
-    });
-}
+// Helper functions
+const getDb = () => db;
 
-// Save tweets
-function saveTweets(tweets, email, username) {
-    return new Promise((resolve, reject) => {
-        const stmt = db.prepare(`
-            INSERT OR IGNORE INTO tweets (tweet_id, username, email, content, created_at)
-            VALUES (?, ?, ?, ?, ?)
-        `);
-
-        let savedCount = 0;
-        tweets.forEach(tweet => {
-            stmt.run([
-                tweet.id,
-                username,
-                email,
-                tweet.fullText,
-                tweet.createdAt
-            ], function(err) {
-                if (err) {
-                    console.error('Error saving tweet:', err);
-                } else if (this.changes > 0) {
-                    savedCount++;
-                }
-            });
-        });
-
-        stmt.finalize(err => {
-            if (err) {
-                reject(err);
-            } else {
-                resolve(savedCount);
-            }
-        });
-    });
-}
-
-// Get all subscriptions
-function getSubscriptions() {
-    return new Promise((resolve, reject) => {
-        db.all('SELECT * FROM subscriptions ORDER BY created_at DESC', (err, rows) => {
-            if (err) {
-                reject(err);
-            } else {
-                resolve(rows);
-            }
-        });
-    });
-}
-
-// Get all tweets
-function getTweets() {
-    return new Promise((resolve, reject) => {
-        db.all('SELECT * FROM tweets ORDER BY created_at DESC', (err, rows) => {
-            if (err) {
-                reject(err);
-            } else {
-                resolve(rows);
-            }
-        });
-    });
-}
-
-// Get tweets for a specific subscription
-function getTweetsForSubscription(email, username) {
+// Get handles by email
+const getHandlesByEmail = (email) => {
     return new Promise((resolve, reject) => {
         db.all(
-            'SELECT * FROM tweets WHERE email = ? AND username = ? ORDER BY created_at DESC',
-            [email, username],
-            (err, rows) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve(rows);
-                }
-            }
-        );
-    });
-}
-
-// Get handles associated with an email
-function getHandlesByEmail(email) {
-    return new Promise((resolve, reject) => {
-        db.all(
-            'SELECT username FROM subscriptions WHERE email = ?',
+            `SELECT s.handle FROM subscriptions s
+            JOIN users u ON s.user_id = u.id
+            WHERE u.email = ? AND s.is_active = 1`,
             [email],
             (err, rows) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve(rows.map(row => row.username));
-                }
+                if (err) return reject(err);
+                resolve(rows.map(row => row.handle));
             }
         );
     });
-}
+};
+
+// Add subscription
+const addSubscription = (email, handle) => {
+    return new Promise((resolve, reject) => {
+        db.run(
+            `INSERT OR IGNORE INTO users (email) VALUES (?)`,
+            [email],
+            function(err) {
+                if (err) return reject(err);
+                const userId = this.lastID;
+                db.run(
+                    `INSERT OR IGNORE INTO subscriptions (user_id, handle) VALUES (?, ?)`,
+                    [userId, handle],
+                    function(err) {
+                        if (err) return reject(err);
+                        resolve(this.lastID);
+                    }
+                );
+            }
+        );
+    });
+};
+
+// Save tweets
+const saveTweets = (tweets, email, handle) => {
+    return new Promise((resolve, reject) => {
+        db.serialize(() => {
+            db.run('BEGIN TRANSACTION');
+
+            const stmt = db.prepare(
+                `INSERT OR IGNORE INTO tweets (tweet_id, handle, content)
+                VALUES (?, ?, ?)`
+            );
+
+            tweets.forEach(tweet => {
+                stmt.run(tweet.id, handle, JSON.stringify(tweet));
+            });
+
+            stmt.finalize(err => {
+                if (err) {
+                    db.run('ROLLBACK');
+                    return reject(err);
+                }
+                db.run('COMMIT', err => {
+                    if (err) return reject(err);
+                    resolve(tweets.length);
+                });
+            });
+        });
+    });
+};
+
+// Get subscriptions
+const getSubscriptions = () => {
+    return new Promise((resolve, reject) => {
+        db.all(
+            `SELECT u.email, s.handle FROM subscriptions s
+            JOIN users u ON s.user_id = u.id
+            WHERE s.is_active = 1`,
+            (err, rows) => {
+                if (err) return reject(err);
+                resolve(rows);
+            }
+        );
+    });
+};
 
 module.exports = {
+    getDb,
+    getHandlesByEmail,
     addSubscription,
     saveTweets,
-    getSubscriptions,
-    getTweets,
-    getTweetsForSubscription,
-    getHandlesByEmail
+    getSubscriptions
 };

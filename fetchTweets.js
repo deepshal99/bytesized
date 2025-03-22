@@ -6,6 +6,7 @@ const http = require('http');
 const fs = require('fs');
 const url = require('url');
 const db = require('./database');
+const cron = require('node-cron');
 
 // Initialize OpenAI with API key
 const openai = new OpenAI({
@@ -17,6 +18,11 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Initialize Rettiwt with API key
 const rettiwt = new Rettiwt({ apiKey: process.env.RETTIWT_API_KEY });
+
+// Function to get current time in IST
+function getCurrentIST() {
+    return new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
+}
 
 // Function to summarize tweets using OpenAI
 async function summarizeTweets(tweets) {
@@ -64,55 +70,12 @@ async function summarizeTweets(tweets) {
     }
 }
 
-// Function to send tweets via email
-async function sendTweetsByEmail(email, username, tweets) {
+// Function to fetch tweets from last 24 hours
+async function fetchRecentTweetsForHandles(handles) {
     try {
-        // Get summary of tweets
-        const summary = await summarizeTweets(tweets);
-        console.log('Successfully created summary for tweets');
+        const now = new Date();
+        const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-        const emailContent = `Summary of tweets from @${username}:
-
-${summary}`;
-        console.log('Email content prepared');
-
-        console.log('Sending email to:', email);
-        const response = await resend.emails.send({
-            from: 'ByteSize <onboarding@resend.dev>',
-            to: email,
-            subject: `Summary of tweets from @${username}`,
-            text: emailContent
-        });
-        
-        console.log('Email response:', response);
-        console.log(`Email sent successfully to ${email}`);
-    } catch (error) {
-        console.error('Error sending email:', {
-            error: error.message,
-            stack: error.stack,
-            email,
-            username
-        });
-        throw error;
-    }
-}
-
-// Function to fetch handles associated with an email
-async function getHandlesForEmail(email) {
-    try {
-        console.log(`Fetching handles for email: ${email}`);
-        const handles = await db.getHandlesByEmail(email);
-        console.log(`Found ${handles.length} handles for email: ${email}`);
-        return handles;
-    } catch (error) {
-        console.error('Error fetching handles:', error);
-        throw error;
-    }
-}
-
-// Function to fetch recent tweets from multiple handles
-async function fetchRecentTweetsForHandles(handles, email) {
-    try {
         console.log(`Fetching tweets for ${handles.length} handles`);
         const allTweets = [];
 
@@ -121,47 +84,99 @@ async function fetchRecentTweetsForHandles(handles, email) {
             const tweets = await rettiwt.tweet.search({
                 fromUsers: [handle],
                 words: [],
+                since: twentyFourHoursAgo,
+                until: now,
                 limit: 100
             });
 
             const originalTweets = tweets.list.filter(tweet => !tweet.replyTo);
             console.log(`Found ${originalTweets.length} original tweets for @${handle}`);
             allTweets.push(...originalTweets);
+        }
 
-            // Save subscription and tweets to database
+        return allTweets;
+    } catch (error) {
+        console.error('Error fetching tweets:', error);
+        throw error;
+    }
+}
+
+// Function to send daily newsletter
+async function sendDailyNewsletter() {
+    try {
+        console.log(`[${getCurrentIST()}] Starting daily newsletter process`);
+
+        // Get all unique emails
+        const subscriptions = await db.getSubscriptions();
+        const emails = [...new Set(subscriptions.map(sub => sub.email))];
+
+        for (const email of emails) {
             try {
-                await db.addSubscription(email, handle);
-                const savedCount = await db.saveTweets(originalTweets, email, handle);
-                console.log(`Saved ${savedCount} new tweets to database for @${handle}`);
-            } catch (dbError) {
-                console.error('Database error:', dbError);
+                console.log(`Processing email: ${email}`);
+                const handles = await db.getHandlesByEmail(email);
+                if (handles.length === 0) continue;
+
+                const tweets = await fetchRecentTweetsForHandles(handles);
+                if (tweets.length === 0) {
+                    console.log(`No new tweets found for ${email}`);
+                    continue;
+                }
+
+                const summary = await summarizeTweets(tweets);
+                const emailContent = {
+                    from: 'ByteSize <onboarding@resend.dev>',
+                    to: email,
+                    subject: 'Your Daily Twitter Newsletter',
+                    text: summary
+                };
+
+                const response = await resend.emails.send(emailContent);
+                console.log(`Newsletter sent to ${email} with response: ${JSON.stringify(response)}`);
+            } catch (error) {
+                console.error(`Error processing email ${email}:`, error);
             }
         }
 
-        if (allTweets.length === 0) {
-            return 'No original tweets found for any of the handles.';
-        }
-
-        // Send tweets via email
-        await sendTweetsByEmail(email, handles.join(', '), allTweets);
-
-        // Format output
-        let output = `Successfully subscribed ${email} to tweets from ${handles.length} handles\n\n`;
-        output += `Original Tweets:\n\n`;
-        
-        allTweets.forEach(tweet => {
-            console.log('Full tweet object:', JSON.stringify(tweet, null, 2));
-            const date = new Date(tweet.createdAt);
-            const formattedDate = date.toLocaleString();
-            output += `[@${tweet.tweetBy.userName}] [${formattedDate}]\n${tweet.fullText}\n\n`;
-        });
-        
-        output += `Total original tweets found: ${allTweets.length}`;
-        return output;
+        console.log(`[${getCurrentIST()}] Daily newsletter process completed`);
     } catch (error) {
-        return `Error fetching tweets: ${error.message}`;
+        console.error('Error in daily newsletter process:', error);
     }
 }
+
+// Function to subscribe email to handles
+async function subscribeEmailToHandles(email, handle) {
+    try {
+        // Add subscription to database
+        await db.addSubscription(email, handle);
+
+        // Send confirmation email
+        const confirmationEmail = {
+            from: 'ByteSize <onboarding@resend.dev>',
+            to: email,
+            subject: 'Subscription Confirmation',
+            text: `You are now subscribed to @${handle}.
+
+You will receive your daily newsletter at 5:28 PM IST.`
+        };
+
+        const response = await resend.emails.send(confirmationEmail);
+        console.log('Confirmation email response:', response);
+
+        return `Successfully subscribed ${email} to @${handle}. Check your inbox for confirmation!`;
+    } catch (error) {
+        console.error('Subscription error:', error);
+        throw error;
+    }
+}
+
+// Schedule daily newsletter at 5:28 PM IST
+cron.schedule('28 17 * * *', () => {
+    sendDailyNewsletter();
+}, {
+    timezone: 'Asia/Kolkata'
+});
+
+console.log('Daily newsletter scheduled to run at 5:28 PM IST');
 
 // Export the function for use in other modules
 module.exports = {
@@ -171,81 +186,43 @@ module.exports = {
 // Create HTTP server
 const server = http.createServer(async (req, res) => {
     const parsedUrl = url.parse(req.url, true);
-    
-    if (parsedUrl.pathname === '/') {
+
+    if (parsedUrl.pathname === '/subscribe' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => {
+            body += chunk.toString();
+        });
+        req.on('end', async () => {
+            try {
+                const { email, handle } = JSON.parse(body);
+                const result = await subscribeEmailToHandles(email, handle);
+                res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+                res.end(JSON.stringify({ message: result }));
+            } catch (error) {
+                res.writeHead(500, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+                res.end(JSON.stringify({ error: error.message }));
+            }
+        });
+    } else if (parsedUrl.pathname === '/') {
         // Serve the main HTML file
         fs.readFile('index.html', (err, content) => {
             if (err) {
                 res.writeHead(500);
-                res.end('Error loading index.html');
-                return;
+                res.end('Error loading page');
+            } else {
+                res.writeHead(200, { 'Content-Type': 'text/html', 'Access-Control-Allow-Origin': '*' });
+                res.end(content);
             }
-            res.writeHead(200, { 'Content-Type': 'text/html' });
-            res.end(content);
         });
     } else if (parsedUrl.pathname === '/view') {
-        // Serve the database viewer HTML file
-        fs.readFile('viewSubscriptions.html', (err, content) => {
-            if (err) {
-                res.writeHead(500);
-                res.end('Error loading viewSubscriptions.html');
-                return;
-            }
-            res.writeHead(200, { 'Content-Type': 'text/html' });
-            res.end(content);
-        });
-    } else if (parsedUrl.pathname === '/subscriptions') {
-        // Return all subscriptions as JSON
+        // View database contents
         try {
             const subscriptions = await db.getSubscriptions();
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify(subscriptions));
+            res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+            res.end(JSON.stringify(subscriptions, null, 2));
         } catch (error) {
             res.writeHead(500);
-            res.end(JSON.stringify({ error: error.message }));
-        }
-    } else if (parsedUrl.pathname === '/stored-tweets') {
-        // Return all tweets as JSON
-        try {
-            const tweets = await db.getTweets();
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify(tweets));
-        } catch (error) {
-            res.writeHead(500);
-            res.end(JSON.stringify({ error: error.message }));
-        }
-    } else if (parsedUrl.pathname === '/fetch-tweets') {
-        if (req.method === 'POST') {
-            // Handle POST request with JSON data
-            let body = '';
-            req.on('data', chunk => {
-                body += chunk.toString();
-            });
-            
-            req.on('end', async () => {
-                try {
-                    const { email, username } = JSON.parse(body);
-                    if (!email || !username) {
-                        res.writeHead(400);
-                        res.end('Email and username are required');
-                        return;
-                    }
-
-                    // Get all handles for the email
-                    const handles = await getHandlesForEmail(email);
-                    handles.push(username); // Add the new handle
-
-                    const result = await fetchRecentTweetsForHandles(handles, email);
-                    res.writeHead(200, { 'Content-Type': 'text/plain' });
-                    res.end(result);
-                } catch (error) {
-                    res.writeHead(500);
-                    res.end(`Error: ${error.message}`);
-                }
-            });
-        } else {
-            res.writeHead(405);
-            res.end('Method not allowed');
+            res.end('Error fetching database');
         }
     } else {
         res.writeHead(404);
