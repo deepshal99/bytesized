@@ -18,10 +18,9 @@ db.serialize(() => {
         user_id INTEGER NOT NULL,
         handle TEXT NOT NULL,
         is_active BOOLEAN DEFAULT 1,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY(user_id) REFERENCES users(id),
-        UNIQUE(user_id, handle)
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )`);
+    db.run('PRAGMA foreign_keys = ON;');
 
     // Tweets table
     db.run(`CREATE TABLE IF NOT EXISTS tweets (
@@ -125,5 +124,6 @@ module.exports = {
     getHandlesByEmail,
     addSubscription,
     saveTweets,
-    getSubscriptions
+    getSubscriptions,
+    
 };
