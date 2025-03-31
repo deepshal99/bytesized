@@ -275,7 +275,7 @@ async function sendDailyNewsletter() {
 
                 const summary = await summarizeTweets(tweets);
                 const emailContent = {
-                    from: 'ByteSize <onboarding@resend.dev>',
+                    from: 'ByteSize <hello@autodm.in>',
                     to: email,
                     subject: 'Your Daily Twitter Newsletter',
                     html: summary
@@ -434,7 +434,7 @@ async function subscribeEmailToHandles(email, handles) {
 
         // Send confirmation email
         const confirmationEmail = {
-            from: 'ByteSize <onboarding@resend.dev>',
+            from: 'ByteSize <hello@autodm.in>',
             to: email,
             subject: 'Subscription Confirmation',
             html: `<p>You have successfully subscribed to ${handles.join(', ')} on Bytesized News.</p>`
@@ -467,7 +467,7 @@ function scheduleDailyAt(time) {
 }
 
 // Schedule daily newsletter at specified time (HH:MM in 24-hour format)
-scheduleDailyAt('14:49');
+scheduleDailyAt('17:24');
 
 console.log('Daily newsletter scheduled to run at 5:28 PM IST');
 

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Database Viewer</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    th, td { padding: 10px; border: 1px solid #ddd; text-align: left; }
+    th { background-color: #f4f4f4; }
+    .section { margin-bottom: 40px; }
+    .section h2 { margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+  <h1>Database Viewer</h1>
+
+  <div class="section">
+    <h2>Subscriptions</h2>
+    <table id="subscriptions">
+      <thead>
+        <tr>
+          <th>Email</th>
+          <th>Handle</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Tweets</h2>
+    <table id="tweets">
+      <thead>
+        <tr>
+          <th>Handle</th>
+          <th>Tweets</th>
+          <th>Emails</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Deliveries</h2>
+    <table id="deliveries">
+      <thead>
+        <tr>
+          <th>Email</th>
+          <th>Date</th>
+          <th>Content</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <script>
+    async function loadDatabase() {
+      try {
+        const response = await fetch('/view-db');
+        const data = await response.json();
+
+        const subscriptions = data.find(table => table.table === 'subscriptions');
+        const tweets = data.find(table => table.table === 'tweets');
+        const deliveries = data.find(table => table.table === 'deliveries');
+
+        renderTable('subscriptions', subscriptions.rows);
+        renderTable('tweets', tweets.rows);
+        renderTable('deliveries', deliveries.rows);
+      } catch (error) {
+        console.error('Error loading database:', error);
+        alert('Failed to load database');
+      }
+    }
+
+    function renderTable(tableId, data) {
+      const tbody = document.querySelector(`#${tableId} tbody`);
+      tbody.innerHTML = data.map(row => {
+        return `<tr>${Object.values(row).map(cell => `<td>${cell}</td>`).join('')}</tr>`;
+      }).join('');
+    }
+
+    // Load database on page load
+    loadDatabase();
+  </script>
+</body>
+</html>
