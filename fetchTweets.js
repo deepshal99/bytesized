@@ -1,4 +1,3 @@
-require('dotenv').config();
 const { Rettiwt } = require('rettiwt-api');
 const { Resend } = require('resend');
 const OpenAI = require('openai');
@@ -231,11 +230,6 @@ function scheduleDailyAt(time) {
     });
 }
 
-// Schedule daily newsletter at specified time (HH:MM in 24-hour format)
-scheduleDailyAt('23:51');
-
-console.log('Daily newsletter scheduled to run at 11:51 PM IST');
-
 // Create HTTP server
 const server = http.createServer(async (req, res) => {
     const parsedUrl = url.parse(req.url, true);
@@ -291,3 +285,10 @@ server.listen(PORT, () => {
     console.log(`Server running at http://localhost:${PORT}`);
     console.log('View database at http://localhost:3000/view');
 });
+
+// Schedule daily newsletter at specified time (HH:MM in 24-hour format)
+if (process.env.NODE_ENV !== 'production') {
+    // Only schedule cron job in development
+    scheduleDailyAt('00:25');
+    console.log('Daily newsletter scheduled to run at 11:51 PM IST');
+}
