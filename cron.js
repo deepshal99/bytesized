@@ -2,6 +2,8 @@ const { Rettiwt } = require('rettiwt-api');
 const { Resend } = require('resend');
 const OpenAI = require('openai');
 const db = require('./database');
+const http = require('http');
+const url = require('url');
 
 // Initialize OpenAI with API key
 const openai = new OpenAI({
@@ -107,7 +109,7 @@ async function summarizeTweets(tweets) {
         let summary = '<div style="margin-bottom: 20px;">';
 
         // Generate summary for each user
-        for (const [username, userTweets] of Object.entries(groupedSubscriptions)) {
+        for (const [username, userTweets] of Object.entries(groupedTweets)) {
             const tweetTexts = userTweets.map(tweet => tweet.fullText).join('\n\n');
 
             const completion = await openai.chat.completions.create({
@@ -142,6 +144,30 @@ async function summarizeTweets(tweets) {
         throw error;
     }
 }
+
+// Create HTTP server
+const server = http.createServer(async (req, res) => {
+    const parsedUrl = url.parse(req.url, true);
+    
+    if (parsedUrl.pathname === '/api/newsletter') {
+        try {
+            await sendDailyNewsletter();
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ message: 'Newsletter sent successfully' }));
+        } catch (error) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: error.message }));
+        }
+    } else {
+        res.writeHead(404);
+        res.end('Not Found');
+    }
+});
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`Cron server running at http://localhost:${PORT}`);
+});
 
 module.exports = {
     sendDailyNewsletter
