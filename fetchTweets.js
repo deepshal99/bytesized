@@ -4,7 +4,6 @@ const OpenAI = require('openai');
 const http = require('http');
 const url = require('url');
 const db = require('./database');
-const cron = require('node-cron');
 const fs = require('fs');
 
 // Initialize OpenAI with API key
@@ -220,16 +219,6 @@ You will receive your daily newsletter at 5:28 PM IST.`
     }
 }
 
-// Helper function to convert HH:MM to cron expression
-function scheduleDailyAt(time) {
-    const [hours, minutes] = time.split(':').map(Number);
-    return cron.schedule(`${minutes} ${hours} * * *`, () => {
-        sendDailyNewsletter();
-    }, {
-        timezone: 'Asia/Kolkata'
-    });
-}
-
 // Create HTTP server
 const server = http.createServer(async (req, res) => {
     const parsedUrl = url.parse(req.url, true);
@@ -285,10 +274,3 @@ server.listen(PORT, () => {
     console.log(`Server running at http://localhost:${PORT}`);
     console.log('View database at http://localhost:3000/view');
 });
-
-// Schedule daily newsletter at specified time (HH:MM in 24-hour format)
-if (process.env.NODE_ENV !== 'production') {
-    // Only schedule cron job in development
-    scheduleDailyAt('00:25');
-    console.log('Daily newsletter scheduled to run at 11:51 PM IST');
-}

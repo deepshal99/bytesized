@@ -4,6 +4,10 @@
     {
       "src": "fetchTweets.js",
       "use": "@vercel/node"
+    },
+    {
+      "src": "cron.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
@@ -16,5 +20,12 @@
     "RETTIWT_API_KEY": "${RETTIWT_API_KEY}",
     "OPENAI_API_KEY": "${OPENAI_API_KEY}",
     "RESEND_API_KEY": "${RESEND_API_KEY}"
-  }
+  },
+  "cron": [
+    {
+      "path": "/api/newsletter",
+      "schedule": "0 0 * * *",
+      "timezone": "Asia/Kolkata"
+    }
+  ]
 }
