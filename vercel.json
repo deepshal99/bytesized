@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "fetchTweets.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "fetchTweets.js"
+    }
+  ],
+  "env": {
+    "RETTIWT_API_KEY": "@rettiwt_api_key",
+    "OPENAI_API_KEY": "@openai_api_key",
+    "RESEND_API_KEY": "@resend_api_key"
+  }
+}

@@ -55,23 +55,74 @@ const getHandlesByEmail = (email) => {
 
 // Add subscription
 const addSubscription = (email, handle) => {
+    // Convert single handle to array if necessary
+    const handles = Array.isArray(handle) ? handle : [handle];
+    
     return new Promise((resolve, reject) => {
-        db.run(
-            `INSERT OR IGNORE INTO users (email) VALUES (?)`,
-            [email],
-            function(err) {
+        db.serialize(() => {
+            // First get or create the user
+            db.get(`SELECT id FROM users WHERE email = ?`, [email], (err, user) => {
                 if (err) return reject(err);
-                const userId = this.lastID;
-                db.run(
-                    `INSERT OR IGNORE INTO subscriptions (user_id, handle) VALUES (?, ?)`,
-                    [userId, handle],
-                    function(err) {
-                        if (err) return reject(err);
-                        resolve(this.lastID);
-                    }
-                );
-            }
-        );
+
+                let userId;
+                if (!user) {
+                    // User doesn't exist, create new user
+                    db.run(
+                        `INSERT INTO users (email) VALUES (?)`,
+                        [email],
+                        function(err) {
+                            if (err) return reject(err);
+                            userId = this.lastID;
+                            proceedWithSubscriptions();
+                        }
+                    );
+                } else {
+                    userId = user.id;
+                    proceedWithSubscriptions();
+                }
+
+                function proceedWithSubscriptions() {
+                    const promises = handles.map(h => {
+                        return new Promise((resolve, reject) => {
+                            // Check if subscription already exists
+                            db.get(
+                                `SELECT id FROM subscriptions WHERE user_id = ? AND handle = ?`,
+                                [userId, h],
+                                (err, existingSubscription) => {
+                                    if (err) return reject(err);
+
+                                    if (existingSubscription) {
+                                        // Subscription exists, update it to active
+                                        db.run(
+                                            `UPDATE subscriptions SET is_active = 1 WHERE id = ?`,
+                                            [existingSubscription.id],
+                                            function(err) {
+                                                if (err) return reject(err);
+                                                resolve(existingSubscription.id);
+                                            }
+                                        );
+                                    } else {
+                                        // Create new subscription
+                                        db.run(
+                                            `INSERT INTO subscriptions (user_id, handle, is_active) VALUES (?, ?, 1)`,
+                                            [userId, h],
+                                            function(err) {
+                                                if (err) return reject(err);
+                                                resolve(this.lastID);
+                                            }
+                                        );
+                                    }
+                                }
+                            );
+                        });
+                    });
+
+                    Promise.all(promises)
+                        .then(() => resolve(userId))
+                        .catch(reject);
+                }
+            });
+        });
     });
 };
 
@@ -125,5 +176,4 @@ module.exports = {
     addSubscription,
     saveTweets,
     getSubscriptions,
-    
 };

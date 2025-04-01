@@ -40,3 +40,37 @@ The server runs on `http://localhost:3000` and provides endpoints for:
 - Fetching tweets
 - Viewing database contents
 - Sending email summaries
+
+## Deployment
+
+To deploy this application to Vercel:
+
+1. Create a GitHub repository and push your code
+2. Create a Vercel account if you don't have one
+3. Connect your GitHub account to Vercel
+4. Import your repository
+5. Set up environment variables in Vercel dashboard:
+   - RETTIWT_API_KEY
+   - OPENAI_API_KEY
+   - RESEND_API_KEY
+
+The application will be automatically deployed and started on Vercel.
+
+## Local Development
+
+1. Install dependencies:
+```bash
+npm install
+```
+
+2. Copy `.env.example` to `.env` and fill in your API keys:
+```bash
+cp .env.example .env
+```
+
+3. Start the application:
+```bash
+npm start
+```
+
+The application will be running at `http://localhost:3000`
