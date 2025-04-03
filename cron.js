@@ -1,7 +1,8 @@
+import process from "node:process";
 const { Rettiwt } = require('rettiwt-api');
 const { Resend } = require('resend');
 const OpenAI = require('openai');
-const db = require('./database');
+const db = require("./database.js");
 const http = require('http');
 const url = require('url');
 
@@ -70,7 +71,8 @@ async function sendDailyNewsletter() {
                 html: emailContent
             };
 
-            const response = await resend.emails.send(emailData);
+            // const response = await resend.emails.send(emailData);
+            await resend.emails.send(emailData);
             console.log(`Newsletter sent to ${email} at ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })}`);
         }
     } catch (error) {
@@ -81,16 +83,25 @@ async function sendDailyNewsletter() {
 
 // Function to fetch tweets from last 24 hours
 async function fetchRecentTweetsForHandles(handles) {
-    const allTweets = [];
-    
-    for (const handle of handles) {
-        console.log(`Fetching tweets for handle: @${handle}`);
-        const tweets = await rettiwt.getRecentTweets(handle, { maxResults: 50 });
-        allTweets.push(...tweets.data);
-        console.log(`Found ${tweets.data.length} tweets for @${handle}`);
-    }
+    try {
+        const allTweets = [];
+        
+        for (const handle of handles) {
+            console.log(`Fetching tweets for handle: @${handle}`);
+            const tweets = await rettiwt.tweet.search({
+                fromUsers: [handle],
+                words: [],
+                limit: 100
+            });
+            allTweets.push(...tweets.list);
+            console.log(`Found ${tweets.list.length} tweets for @${handle}`);
+        }
 
-    return allTweets;
+        return allTweets;
+    } catch (error) {
+        console.error('Error fetching tweets:', error);
+        throw error;
+    }
 }
 
 // Function to summarize tweets using OpenAI

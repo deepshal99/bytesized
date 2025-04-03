@@ -1,9 +1,10 @@
+import process from "node:process";
 const { Rettiwt } = require('rettiwt-api');
 const { Resend } = require('resend');
 const OpenAI = require('openai');
 const http = require('http');
 const url = require('url');
-const db = require('./database');
+const db = require("./database.js");
 const fs = require('fs');
 
 // Initialize OpenAI with API key
@@ -15,7 +16,16 @@ const openai = new OpenAI({
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Initialize Rettiwt with API key
-const rettiwt = new Rettiwt({ apiKey: process.env.RETTIWT_API_KEY });
+let rettiwt;
+try {
+    if (!process.env.RETTIWT_API_KEY) {
+        throw new Error('RETTIWT_API_KEY environment variable is not set');
+    }
+    rettiwt = new Rettiwt({ apiKey: process.env.RETTIWT_API_KEY });
+} catch (error) {
+    console.error('Error initializing Rettiwt:', error.message);
+    throw new Error(`Failed to initialize Rettiwt API: ${error.message}. Please check your API key configuration.`);
+}
 
 // Function to get current time in IST
 function getCurrentIST() {
@@ -88,6 +98,7 @@ async function fetchRecentTweetsForHandles(handles) {
         const allTweets = [];
     
         // Helper function to segregate tweets into main tweets and replies
+        // deno-lint-ignore no-inner-declarations
         function segregateTweet(tweets) {
             const categorizedTweets = {
                 mainTweets: [],
@@ -181,7 +192,8 @@ async function sendDailyNewsletter() {
                 html: emailContent
             };
 
-            const response = await resend.emails.send(emailData);
+            // const response = await resend.emails.send(emailData);
+            await resend.emails.send(emailData);
             console.log(`Newsletter sent to ${email} at ${getCurrentIST()}`);
         }
     } catch (error) {
@@ -210,6 +222,7 @@ You will receive your daily newsletter at 5:28 PM IST.`
         };
 
         const response = await resend.emails.send(confirmationEmail);
+        await resend.emails.send(confirmationEmail);
         console.log('Confirmation email response:', response);
 
         return `Successfully subscribed ${email} to @${handles.join(', @')}. Check your inbox for confirmation!`;
