@@ -1,10 +1,11 @@
 import process from "node:process";
-const { Rettiwt } = require('rettiwt-api');
-const { Resend } = require('resend');
-const OpenAI = require('openai');
-const db = require("./database.js");
-const http = require('http');
-const url = require('url');
+import { Rettiwt } from 'rettiwt-api';
+import { Resend } from 'resend';
+import OpenAI from 'openai';
+import * as db from "./database.js";
+import http from 'http';
+import url from 'url';
+import cron from 'node-cron';
 
 // Initialize OpenAI with API key
 const openai = new OpenAI({
@@ -20,12 +21,12 @@ const rettiwt = new Rettiwt({ apiKey: process.env.RETTIWT_API_KEY });
 // Function to send daily newsletter
 async function sendDailyNewsletter() {
     try {
-        console.log('Starting daily newsletter process at', new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+        console.log('Starting daily newsletter process at', getCurrentIST());
         
-        // Get all active subscriptions
+        // Get all active subscriptions using the imported db module
         const subscriptions = await db.getSubscriptions();
         
-        if (subscriptions.length === 0) {
+        if (!subscriptions || subscriptions.length === 0) {
             console.log('No active subscriptions found');
             return;
         }
@@ -71,9 +72,8 @@ async function sendDailyNewsletter() {
                 html: emailContent
             };
 
-            // const response = await resend.emails.send(emailData);
             await resend.emails.send(emailData);
-            console.log(`Newsletter sent to ${email} at ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })}`);
+            console.log(`Newsletter sent to ${email} at ${getCurrentIST()}`);
         }
     } catch (error) {
         console.error('Error in daily newsletter:', error);
@@ -175,11 +175,37 @@ const server = http.createServer(async (req, res) => {
     }
 });
 
-const PORT = process.env.PORT || 3000;
+// Function to get current time in IST
+function getCurrentIST() {
+    return new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
+}
+
+const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
+    const now = new Date();
+    const futureTime = new Date(now.getTime() + 2 * 60000); // 2 minutes in future
+    const scheduledMinute = futureTime.getMinutes();
+    const scheduledHour = futureTime.getHours();
+    
     console.log(`Cron server running at http://localhost:${PORT}`);
+    console.log(`Newsletter scheduled for ${scheduledHour}:${scheduledMinute.toString().padStart(2, '0')} IST (${getCurrentIST()})`);
+    
+    // Schedule newsletter to run at calculated time
+    cron.schedule(`0 ${scheduledMinute} ${scheduledHour} * * *`, async () => {
+        console.log(`Running scheduled newsletter at ${getCurrentIST()}`);
+        try {
+            await sendDailyNewsletter();
+            console.log(`Scheduled newsletter completed successfully at ${getCurrentIST()}`);
+        } catch (error) {
+            console.error(`Error in scheduled newsletter at ${getCurrentIST()}:`, error);
+        }
+    }, {
+        scheduled: true,
+        timezone: "Asia/Kolkata", // Set timezone to IST
+        name: 'daily-newsletter'
+    });
 });
 
-module.exports = {
+export {
     sendDailyNewsletter
 };

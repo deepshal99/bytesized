@@ -1,31 +1,32 @@
 import process from "node:process";
-const { Rettiwt } = require('rettiwt-api');
-const { Resend } = require('resend');
-const OpenAI = require('openai');
-const http = require('http');
-const url = require('url');
-const db = require("./database.js");
-const fs = require('fs');
+import { Rettiwt } from 'rettiwt-api';
+import { Resend } from 'resend';
+import OpenAI from 'openai';
+import http from 'http';
+import url from 'url';
+import * as db from "./database.js";
+import fs from 'fs';
+import { OPENAI_API_KEY, RETTIWT_API_KEY, RESEND_API_KEY } from './config.js';
 
 // Initialize OpenAI with API key
 const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY
+    apiKey: OPENAI_API_KEY
 });
 
 // Initialize Resend with your API key
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = new Resend(RESEND_API_KEY);
 
 // Initialize Rettiwt with API key
 let rettiwt;
-console.log('RETTIWT_API_KEY check:', process.env.RETTIWT_API_KEY);
+
 try {
     console.log('Initializing Rettiwt...');
-    console.log('RETTIWT_API_KEY:', process.env.RETTIWT_API_KEY);
-    if (!process.env.RETTIWT_API_KEY) {
+  
+    if (!RETTIWT_API_KEY) {
         throw new Error('RETTIWT_API_KEY environment variable is not set');
     }
 
-    rettiwt = new Rettiwt({ apiKey: process.env.RETTIWT_API_KEY });
+    rettiwt = new Rettiwt({ apiKey: RETTIWT_API_KEY });
 } catch (error) {
     console.error('Error initializing Rettiwt:', error.message);
     throw new Error(`Failed to initialize Rettiwt API: ${error.message}. Please check your API key configuration.`);
@@ -222,7 +223,7 @@ async function subscribeEmailToHandles(email, handle) {
             subject: 'Subscription Confirmation',
             text: `You are now subscribed to @${handles.join(', @')}.
 
-You will receive your daily newsletter at 5:28 PM IST.`
+You will receive your daily newsletter at 2:55 AM IST.`
         };
 
         const response = await resend.emails.send(confirmationEmail);
