@@ -17,10 +17,14 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Initialize Rettiwt with API key
 let rettiwt;
+console.log('RETTIWT_API_KEY check:', process.env.RETTIWT_API_KEY);
 try {
+    console.log('Initializing Rettiwt...');
+    console.log('RETTIWT_API_KEY:', process.env.RETTIWT_API_KEY);
     if (!process.env.RETTIWT_API_KEY) {
         throw new Error('RETTIWT_API_KEY environment variable is not set');
     }
+
     rettiwt = new Rettiwt({ apiKey: process.env.RETTIWT_API_KEY });
 } catch (error) {
     console.error('Error initializing Rettiwt:', error.message);
